@@ -7,7 +7,7 @@
 #include <string.h>
 using namespace std;
 
-const int MATRIX_SIZE = 11;
+const int MATRIX_SIZE = 20;
 
 const string INITIAL_STATE = "0";
 
@@ -25,6 +25,11 @@ const int CT_FLOAT_MINUS       =  4;
 const int CT_SPACE_DELIMITER   =  8;
 const int CT_OPERATOR          =  9;
 const int CT_DELIM             = 10;
+const int CT_AND               = 11;
+const int CT_OR                = 12;
+const int CT_PLUS              = 13;
+const int CT_MINUS             = 14;
+const int CT_EQUAL             = 15;
 
 
 const int ST_0                 = 0;
@@ -38,7 +43,15 @@ const int ST_7                 = 7;
 const int ST_8                 = 8;
 const int ST_9                 = 9;
 const int ST_10                = 10;
+const int ST_11                = 11; // &
+const int ST_12                = 12; // |
+const int ST_13                = 13; // +
+const int ST_14                = 14; // -
+const int ST_15                = 15; // =
+const int ST_16                = 16; // double operator final state
 
+
+ 
 
 
 
@@ -82,6 +95,12 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_0][CT_LETTER]                          = ST_1;
     gstate.transition[ST_0][CT_DIGIT]                           = ST_2;
     gstate.transition[ST_0][CT_OPERATOR]                        = ST_9;
+    gstate.transition[ST_0][CT_AND]                             = ST_11;
+    gstate.transition[ST_0][CT_OR]                              = ST_12;
+    gstate.transition[ST_0][CT_PLUS]                            = ST_13;
+    gstate.transition[ST_0][CT_MINUS]                           = ST_14;
+    gstate.transition[ST_0][CT_EQUAL]                           = ST_15;
+
     gstate.transition[ST_1][CT_LETTER]                          = ST_1;
     gstate.transition[ST_1][CT_DIGIT]                           = ST_1;
     gstate.transition[ST_2][CT_DIGIT]                           = ST_2;
@@ -96,6 +115,16 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_6][CT_DIGIT]                           = ST_7;
     gstate.transition[ST_7][CT_DIGIT]                           = ST_7;
 
+
+    gstate.transition[ST_11][CT_AND]                            = ST_16;
+    gstate.transition[ST_12][CT_OR]                             = ST_16;
+    gstate.transition[ST_13][CT_PLUS]                           = ST_16;
+    gstate.transition[ST_13][CT_MINUS]                          = ST_16;
+    gstate.transition[ST_13][CT_EQUAL]                          = ST_16;
+    gstate.transition[ST_14][CT_MINUS]                          = ST_16;
+    gstate.transition[ST_14][CT_PLUS]                           = ST_16;
+    gstate.transition[ST_14][CT_EQUAL]                          = ST_16;
+    gstate.transition[ST_15][CT_EQUAL]                          = ST_16;
 
 
 
@@ -129,7 +158,6 @@ int char_type(char character){
         {
             return CT_FLOAT_MINUS;
         }
-        return CT_OPERATOR;
     }
 
     if(isalpha(character)){
@@ -149,17 +177,34 @@ int char_type(char character){
         return CT_DIGIT;
     }
 
+    if(character == '&'){
+        return CT_AND;
+    }
+
+    if(character == '|'){
+        return CT_OR;
+    }
+
+    if(character == '+'){
+        return CT_PLUS;
+    }
+
+    if(character == '-'){
+        return CT_MINUS;
+    }
+    
+    if(character == '='){
+        return CT_EQUAL;
+    }
+
     switch ( character ){ 
         case '.': return CT_FLOAT_POINT;
         case '/': return 2;
         case ' ': return 8;
         case '\t': return 8;
-        case '+': return CT_OPERATOR;
-        case '-': return CT_OPERATOR;
         case '*': return CT_OPERATOR;
         case '^': return CT_OPERATOR;
         case '%': return CT_OPERATOR;
-        case '=': return CT_OPERATOR;
         case '(': return CT_OPERATOR;
         case ')':  return CT_OPERATOR;
         case '<':  return CT_OPERATOR;
@@ -185,9 +230,13 @@ string get_state_type(int state){
         case ST_7: return "float";
         case ST_8: return "spatiu";
         case ST_9: return "operator";
-        // case 9: return "comentariu";
-        // case 5: return "operator";
         case ST_10: return "delimitator";
+        case ST_11 : return "operator";
+        case ST_12 : return "operator";
+        case ST_13 : return "operator";
+        case ST_14 : return "operator";
+        case ST_15: return "operator";
+        case ST_16: return "operator";
         default: return "err";
     }
 }
