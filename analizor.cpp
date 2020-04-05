@@ -7,7 +7,7 @@
 #include <string.h>
 using namespace std;
 
-const int MATRIX_SIZE = 10;
+const int MATRIX_SIZE = 11;
 
 const string INITIAL_STATE = "0";
 
@@ -17,12 +17,15 @@ const char SUCCESS = 's';
 const char ERROR = 'e';
 
 
-const int CT_LETTER            = 0;
-const int CT_DIGIT             = 1;
-const int CT_FLOAT_POINT       = 2;
-const int CT_FLOAT_E           = 3;
-const int CT_FLOAT_MINUS       = 4;
-const int CT_SPACE_DELIMITER   = 8;
+const int CT_LETTER            =  0;
+const int CT_DIGIT             =  1;
+const int CT_FLOAT_POINT       =  2;
+const int CT_FLOAT_E           =  3;
+const int CT_FLOAT_MINUS       =  4;
+const int CT_SPACE_DELIMITER   =  8;
+const int CT_OPERATOR          =  9;
+const int CT_DELIM             = 10;
+
 
 const int ST_0                 = 0;
 const int ST_1                 = 1;
@@ -34,6 +37,8 @@ const int ST_6                 = 6;
 const int ST_7                 = 7;
 const int ST_8                 = 8;
 const int ST_9                 = 9;
+const int ST_10                = 10;
+
 
 
 
@@ -65,7 +70,7 @@ void init(GSTATE &gstate)
     {
         for(int j=0;j<MATRIX_SIZE;j++)
         {
-            gstate.transition[i][j]=-1;
+            gstate.transition[i][j] = -1;
         }
     }
 }
@@ -76,6 +81,7 @@ void set_transition_states(GSTATE &gstate)
     
     gstate.transition[ST_0][CT_LETTER]                          = ST_1;
     gstate.transition[ST_0][CT_DIGIT]                           = ST_2;
+    gstate.transition[ST_0][CT_OPERATOR]                        = ST_9;
     gstate.transition[ST_1][CT_LETTER]                          = ST_1;
     gstate.transition[ST_1][CT_DIGIT]                           = ST_1;
     gstate.transition[ST_2][CT_DIGIT]                           = ST_2;
@@ -92,24 +98,49 @@ void set_transition_states(GSTATE &gstate)
 
 
 
-// finale states can go to space 
-    // gstate.transition[ST_0][CT_SPACE_DELIMITER]                 = ST_8;
-    // gstate.transition[ST_1][CT_SPACE_DELIMITER]                 = ST_8;
-    // gstate.transition[ST_2][CT_SPACE_DELIMITER]                 = ST_8;
-    // gstate.transition[ST_8][CT_SPACE_DELIMITER]                 = ST_8;
+
 
 }
 
 void set_space_transition_states(GSTATE &gstate){
     for(int i=0;i<MATRIX_SIZE;i++)
     {
-        gstate.transition[i][CT_SPACE_DELIMITER] = CT_SPACE_DELIMITER;
+        gstate.transition[i][CT_SPACE_DELIMITER] = ST_8;
     }
 }
 
+void set_delim_transition_states(GSTATE &gstate){
+    for(int i=0;i<MATRIX_SIZE;i++)
+    {
+        gstate.transition[i][CT_DELIM] = ST_10;
+    }
+    gstate.transition[CT_DELIM][CT_DELIM] = -1;
+}
+
+bool is_float_state(){
+    return gstate.currentState >= 2 && gstate.currentState <=7;
+}
+
 int char_type(char character){
-    // a-z A-Z 
+
+    //float rules
+    if(character == '-'){
+        if(is_float_state())
+        {
+            return CT_FLOAT_MINUS;
+        }
+        return CT_OPERATOR;
+    }
+
     if(isalpha(character)){
+        if(is_float_state())
+        {
+            return CT_FLOAT_E;
+        }
+        return CT_LETTER;
+    }
+
+    if(character == '_'){
         return CT_LETTER;
     }
 
@@ -119,24 +150,25 @@ int char_type(char character){
     }
 
     switch ( character ){ 
+        case '.': return CT_FLOAT_POINT;
         case '/': return 2;
-        case '*': return 3;
         case ' ': return 8;
         case '\t': return 8;
-        case '+':
-        case '-':
-        case '^':
-        case '%':
-        case '=':
-        case '(':
-        case ')': 
-        case '<': 
-        case '>':
-        case '{':
-        case '}':
-        case '[': 
-        case ']': return 5;
-        case ';': return 6;
+        case '+': return CT_OPERATOR;
+        case '-': return CT_OPERATOR;
+        case '*': return CT_OPERATOR;
+        case '^': return CT_OPERATOR;
+        case '%': return CT_OPERATOR;
+        case '=': return CT_OPERATOR;
+        case '(': return CT_OPERATOR;
+        case ')':  return CT_OPERATOR;
+        case '<':  return CT_OPERATOR;
+        case '>': return CT_OPERATOR;
+        case '{': return CT_OPERATOR;
+        case '}': return CT_OPERATOR;
+        case '[':  return CT_OPERATOR;
+        case ']': return CT_OPERATOR;
+        case ';': return CT_DELIM;
         case '\'': return 7;
         case '"': return 99;
         case '\\': return 9;
@@ -149,20 +181,25 @@ string get_state_type(int state){
     switch(state){
         case ST_1: return "identificator";
         case ST_2: return "integer";
-
         case ST_4: return "float";
         case ST_7: return "float";
-        // case 3: return "operator";
-        // case 9: return "comentariu";
         case ST_8: return "spatiu";
+        case ST_9: return "operator";
+        // case 9: return "comentariu";
         // case 5: return "operator";
-        // case 6: return "delimitator";
+        case ST_10: return "delimitator";
         default: return "err";
     }
 }
 
+void echoCurrentToken(){
+    cout << "           " << currentToken << " ( " << get_state_type(gstate.currentState) << " ) \n";
+
+}
+
+
 void echoInitialState(){
-    cout << " ( " << currentToken << " ) | " << get_state_type(gstate.currentState) << " \n";
+    echoCurrentToken();
     cout << INITIAL_STATE ;
     currentToken = "";
 
@@ -202,13 +239,21 @@ void run(){
                 doNext = BLOCK;
             } else {
                 if(nextState == ST_8){
-                    if(gstate.currentState != ST_8){
+                    if(gstate.currentState != ST_8 && gstate.currentState != 0){
                         echoInitialState();
                     }
                 }
+
+                if(nextState == ST_10 ){
+                    if(gstate.currentState != ST_10 && gstate.currentState != 0){
+                        echoInitialState();
+                    }
+                }
+
+                
                 cout << " -> " << nextState; 
                 currentToken += currentChar;
-                currentToken += (char)nextState;
+                // currentToken += (char)nextState;
 
                 gstate.currentState = nextState;
             }
@@ -234,7 +279,7 @@ void run(){
             break;
         }
         case SUCCESS: {
-            cout << " ( " << currentToken << " ) | " << get_state_type(gstate.currentState) << " \n";
+            echoCurrentToken();
 
             cout << "\nS-a terminat analiza lexicala cu SUCCES!\n";
             break;
@@ -262,6 +307,7 @@ int main(){
     init(gstate);
     set_transition_states(gstate);
     set_space_transition_states(gstate);
+    set_delim_transition_states(gstate);
     cout << INITIAL_STATE;
 
     run();
