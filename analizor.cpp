@@ -110,11 +110,10 @@ void init(GSTATE &gstate)
 void set_transition_states(GSTATE &gstate)
 {
 
-    
     gstate.transition[ST_0][CT_LETTER]                          = ST_1;
     gstate.transition[ST_0][CT_DIGIT]                           = ST_2;
     gstate.transition[ST_0][CT_OPERATOR]                        = ST_9;
-    gstate.transition[ST_0][CT_STAR]                            = ST_9;
+    gstate.transition[ST_0][CT_STAR]                        = ST_9;
     gstate.transition[ST_0][CT_AND]                             = ST_11;
     gstate.transition[ST_0][CT_OR]                              = ST_12;
     gstate.transition[ST_0][CT_PLUS]                            = ST_13;
@@ -161,6 +160,7 @@ void set_transition_states(GSTATE &gstate)
 
     gstate.transition[ST_21][CT_EOL]                            = ST_22;
     gstate.transition[ST_21][CT_NOT_EOL]                        = ST_21;
+    gstate.transition[ST_21][CT_SPACE_DELIMITER]                = ST_21;
 
 }
 
@@ -184,6 +184,7 @@ bool is_float_state(){
 }
 
 int char_type(char character){
+    
 
     if(gstate.currentState == ST_18){
         if(character == '*'){
@@ -203,10 +204,15 @@ int char_type(char character){
         return CT_NOT_SLASH;
     }
 
-    if(gstate.currentState == ST_21){
-        if(character == '\n'){
+
+     if(character == '\n'){
+        if(gstate.currentState == ST_21){
             return CT_EOL;
         }
+        return CT_SPACE_DELIMITER;
+    }
+
+    if(gstate.currentState == ST_21){
         return CT_NOT_EOL;
     }
 
@@ -282,10 +288,10 @@ int char_type(char character){
         case '[':  return CT_OPERATOR;
         case ']': return CT_OPERATOR;
         case ';': return CT_DELIM;
-        case 'n': return CT_LETTER;
+        case ',': return CT_DELIM;
         case '"': return 99;
         case EOF : return EOF;
-        default : return -1;
+        default : return 49;
     }
 }
 
@@ -335,21 +341,17 @@ void run(){
         case CONTINUE: {
             char currentChar = file[fileCursor];
             fileCursor++;
-
             int typeOfCurrentCharacter = char_type(currentChar);
             int nextState = gstate.transition[gstate.currentState][typeOfCurrentCharacter];
 
             // end of file 
-            if(typeOfCurrentCharacter == EOF){
-                if(get_state_type(gstate.currentState) != "err"){
-                    doNext = SUCCESS;
-                    currentToken += currentChar;
-                    run();
-                    return;
-                } else {
+            if(currentChar == EOF){
+                if(get_state_type(gstate.currentState) == "err"){
                     doNext = ERROR;
+                } else {
+                    doNext = SUCCESS;
                 }
-                return;
+                run();
             }
 
             
@@ -385,9 +387,16 @@ void run(){
             if(get_state_type(gstate.currentState) == "err"){
                 doNext = ERROR;
             } else {
-                echoInitialState();
-                gstate.currentState = 0;
-                doNext = CONTINUE;
+                if(file[fileCursor] == EOF){
+                    gstate.currentState = 0;
+                    doNext = SUCCESS;
+
+                } else {
+                    echoInitialState();
+                    gstate.currentState = 0;
+                    doNext = CONTINUE;
+                }
+                
             }
             run();
             break;
@@ -419,9 +428,11 @@ int main(){
     string line;
    
     while(getline (MyReadFile,line)){
+        // cout << line;
         file += line;
-        // file += '\n';
+        file += "\n";
     }
+    file += EOF;
     MyReadFile.close();
 
 
