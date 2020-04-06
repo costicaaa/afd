@@ -7,7 +7,7 @@
 #include <string.h>
 using namespace std;
 
-const int MATRIX_SIZE = 20;
+const int MATRIX_SIZE = 50;
 
 const string INITIAL_STATE = "0";
 
@@ -29,7 +29,19 @@ const int CT_AND               = 11;
 const int CT_OR                = 12;
 const int CT_PLUS              = 13;
 const int CT_MINUS             = 14;
-const int CT_EQUAL             = 15;
+const int CT_EQUAL             = 15; /* */
+const int CT_SLASH             = 16;
+const int CT_STAR              = 17;
+const int CT_EOL               = 18;
+const int CT_R_SLASH           = 19;
+const int CT_N                 = 20;
+
+
+const int CT_NOT_SLASH         = 616;
+const int CT_NOT_STAR          = 617;
+const int CT_NOT_EOL           = 618;
+const int CT_NOT_R_SLASH       = 619;
+const int CT_NOT_N             = 620;
 
 
 const int ST_0                 = 0;
@@ -48,7 +60,14 @@ const int ST_12                = 12; // |
 const int ST_13                = 13; // +
 const int ST_14                = 14; // -
 const int ST_15                = 15; // =
-const int ST_16                = 16; // double operator final state
+const int ST_16                = 16; // double operator | FINAL STATE
+const int ST_17                = 17; // / -> final operator or intermediate for comments | FINAL STATE or not
+const int ST_18                = 18; // start of multiline 
+const int ST_19                = 19; // possible state of ending multiline comment
+const int ST_20                = 20; // final state multiline comment | FINAL STATE
+const int ST_21                = 21; // same line comment style
+const int ST_22                = 22; // same line end | FINAL STATE
+
 
 
  
@@ -95,11 +114,13 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_0][CT_LETTER]                          = ST_1;
     gstate.transition[ST_0][CT_DIGIT]                           = ST_2;
     gstate.transition[ST_0][CT_OPERATOR]                        = ST_9;
+    gstate.transition[ST_0][CT_STAR]                            = ST_9;
     gstate.transition[ST_0][CT_AND]                             = ST_11;
     gstate.transition[ST_0][CT_OR]                              = ST_12;
     gstate.transition[ST_0][CT_PLUS]                            = ST_13;
     gstate.transition[ST_0][CT_MINUS]                           = ST_14;
     gstate.transition[ST_0][CT_EQUAL]                           = ST_15;
+    gstate.transition[ST_0][CT_SLASH]                           = ST_17;
 
     gstate.transition[ST_1][CT_LETTER]                          = ST_1;
     gstate.transition[ST_1][CT_DIGIT]                           = ST_1;
@@ -123,11 +144,23 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_13][CT_EQUAL]                          = ST_16;
     gstate.transition[ST_14][CT_MINUS]                          = ST_16;
     gstate.transition[ST_14][CT_PLUS]                           = ST_16;
-    gstate.transition[ST_14][CT_EQUAL]                          = ST_16;
+    gstate.transition[ST_14][CT_EQUAL]                          = ST_16;/* */ // \n
     gstate.transition[ST_15][CT_EQUAL]                          = ST_16;
 
+    gstate.transition[ST_17][CT_STAR]                           = ST_18;
+    gstate.transition[ST_17][CT_SLASH]                          = ST_21;
+
+    gstate.transition[ST_18][CT_STAR]                           = ST_19;
+    gstate.transition[ST_18][CT_NOT_STAR]                       = ST_18;
 
 
+    gstate.transition[ST_19][CT_SLASH]                          = ST_20; 
+    gstate.transition[ST_19][CT_STAR]                           = ST_19; 
+    gstate.transition[ST_19][CT_NOT_SLASH]                      = ST_18;
+
+
+    gstate.transition[ST_21][CT_EOL]                            = ST_22;
+    gstate.transition[ST_21][CT_NOT_EOL]                        = ST_21;
 
 }
 
@@ -152,6 +185,32 @@ bool is_float_state(){
 
 int char_type(char character){
 
+    if(gstate.currentState == ST_18){
+        if(character == '*'){
+            return CT_STAR;
+        }
+        return CT_NOT_STAR;
+    }
+
+    if(gstate.currentState == ST_19){
+        if(character == '/'){
+            return CT_SLASH;
+        }
+        if(character == '*'){
+            return CT_STAR;
+        }
+
+        return CT_NOT_SLASH;
+    }
+
+    if(gstate.currentState == ST_21){
+        if(character == '\n'){
+            return CT_EOL;
+        }
+        return CT_NOT_EOL;
+    }
+
+   
     //float rules
     if(character == '-'){
         if(is_float_state())
@@ -197,12 +256,21 @@ int char_type(char character){
         return CT_EQUAL;
     }
 
+
+    if(character == '/'){
+        return CT_SLASH;
+    }
+
+
+    if(character == 'n'){
+        return CT_N;
+    }
+
     switch ( character ){ 
         case '.': return CT_FLOAT_POINT;
-        case '/': return 2;
         case ' ': return 8;
         case '\t': return 8;
-        case '*': return CT_OPERATOR;
+        case '*': return CT_STAR;
         case '^': return CT_OPERATOR;
         case '%': return CT_OPERATOR;
         case '(': return CT_OPERATOR;
@@ -214,9 +282,8 @@ int char_type(char character){
         case '[':  return CT_OPERATOR;
         case ']': return CT_OPERATOR;
         case ';': return CT_DELIM;
-        case '\'': return 7;
+        case 'n': return CT_LETTER;
         case '"': return 99;
-        case '\\': return 9;
         case EOF : return EOF;
         default : return -1;
     }
@@ -237,6 +304,9 @@ string get_state_type(int state){
         case ST_14 : return "operator";
         case ST_15: return "operator";
         case ST_16: return "operator";
+        case ST_17: return "operator"; // / 
+        case ST_20: return "comment"; // / 
+        case ST_22: return "comment"; // / 
         default: return "err";
     }
 }
@@ -261,11 +331,11 @@ void run(){
         // cout << "\n";
         // cout << "-------------";
         // cout << "\n";
-    
     switch(doNext){
         case CONTINUE: {
             char currentChar = file[fileCursor];
             fileCursor++;
+
             int typeOfCurrentCharacter = char_type(currentChar);
             int nextState = gstate.transition[gstate.currentState][typeOfCurrentCharacter];
 
@@ -340,6 +410,7 @@ void run(){
 
 }
 
+#define MAXCHAR 1000
 
 
 int main(){
@@ -349,6 +420,7 @@ int main(){
    
     while(getline (MyReadFile,line)){
         file += line;
+        // file += '\n';
     }
     MyReadFile.close();
 
