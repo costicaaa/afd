@@ -131,6 +131,7 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_0][CT_SLASH]                           = ST_17;
     gstate.transition[ST_0][CT_QUOTE_X2]                        = ST_23;
     gstate.transition[ST_0][CT_QUOTE]                           = ST_25;
+    gstate.transition[ST_0][CT_FLOAT_POINT]                     = ST_9;
 
     gstate.transition[ST_1][CT_LETTER]                          = ST_1;
     gstate.transition[ST_1][CT_DIGIT]                           = ST_1;
@@ -256,7 +257,10 @@ int char_type(char character){
     if(isalpha(character)){
         if(is_float_state())
         {
-            return CT_FLOAT_E;
+            if(character == 'e' || character == 'E')
+            {
+                return CT_FLOAT_E;
+            }
         }
         return CT_LETTER;
     }
@@ -329,6 +333,7 @@ string get_state_type(int state){
         case ST_1: return "identificator";
         case ST_2: return "integer";
         case ST_4: return "float";
+        // case ST_5: return "float";
         case ST_7: return "float";
         case ST_8: return "spatiu";
         case ST_9: return "operator";
@@ -382,7 +387,6 @@ void run(){
                 } else {
                     doNext = SUCCESS;
                 }
-                run();
             }
 
             
@@ -453,9 +457,9 @@ void run(){
 #define MAXCHAR 1000
 
 
-int main(){
+int main(int argc, char *argv[]){
 
-    ifstream MyReadFile("small_test.txt");
+    ifstream MyReadFile(argv[1]);
     string line;
    
     while(getline (MyReadFile,line)){
