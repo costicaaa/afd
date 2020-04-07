@@ -35,6 +35,8 @@ const int CT_STAR              = 17;
 const int CT_EOL               = 18;
 const int CT_R_SLASH           = 19;
 const int CT_N                 = 20;
+const int CT_QUOTE_X2          = 21;
+const int CT_QUOTE             = 22;
 
 
 const int CT_NOT_SLASH         = 616;
@@ -42,6 +44,8 @@ const int CT_NOT_STAR          = 617;
 const int CT_NOT_EOL           = 618;
 const int CT_NOT_R_SLASH       = 619;
 const int CT_NOT_N             = 620;
+const int CT_NOT_QUOTE_X2      = 621;
+const int CT_ANYTHING          = 622;
 
 
 const int ST_0                 = 0;
@@ -68,8 +72,13 @@ const int ST_20                = 20; // final state multiline comment | FINAL ST
 const int ST_21                = 21; // same line comment style
 const int ST_22                = 22; // same line end | FINAL STATE
 
+const int ST_23                = 23; // string states
+const int ST_24                = 24; // string states
 
 
+const int ST_25                = 25; // character literal states
+const int ST_26                = 26; // character literal states
+const int ST_27                = 27; // character literal states
  
 
 
@@ -113,13 +122,15 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_0][CT_LETTER]                          = ST_1;
     gstate.transition[ST_0][CT_DIGIT]                           = ST_2;
     gstate.transition[ST_0][CT_OPERATOR]                        = ST_9;
-    gstate.transition[ST_0][CT_STAR]                        = ST_9;
+    gstate.transition[ST_0][CT_STAR]                            = ST_9;
     gstate.transition[ST_0][CT_AND]                             = ST_11;
     gstate.transition[ST_0][CT_OR]                              = ST_12;
     gstate.transition[ST_0][CT_PLUS]                            = ST_13;
     gstate.transition[ST_0][CT_MINUS]                           = ST_14;
     gstate.transition[ST_0][CT_EQUAL]                           = ST_15;
     gstate.transition[ST_0][CT_SLASH]                           = ST_17;
+    gstate.transition[ST_0][CT_QUOTE_X2]                        = ST_23;
+    gstate.transition[ST_0][CT_QUOTE]                           = ST_25;
 
     gstate.transition[ST_1][CT_LETTER]                          = ST_1;
     gstate.transition[ST_1][CT_DIGIT]                           = ST_1;
@@ -162,6 +173,12 @@ void set_transition_states(GSTATE &gstate)
     gstate.transition[ST_21][CT_NOT_EOL]                        = ST_21;
     gstate.transition[ST_21][CT_SPACE_DELIMITER]                = ST_21;
 
+    gstate.transition[ST_23][CT_NOT_QUOTE_X2]                   = ST_23;
+    gstate.transition[ST_23][CT_QUOTE_X2]                       = ST_24;
+
+    gstate.transition[ST_25][CT_ANYTHING]                       = ST_26;
+    gstate.transition[ST_26][CT_QUOTE]                          = ST_27;
+
 }
 
 void set_space_transition_states(GSTATE &gstate){
@@ -185,6 +202,17 @@ bool is_float_state(){
 
 int char_type(char character){
     
+    if(gstate.currentState == ST_25){
+        return CT_ANYTHING;
+    }
+
+    if(gstate.currentState == ST_23){
+        if(character != '"'){
+            return CT_NOT_QUOTE_X2;
+        }
+        return CT_QUOTE_X2;
+    }
+
 
     if(gstate.currentState == ST_18){
         if(character == '*'){
@@ -289,7 +317,8 @@ int char_type(char character){
         case ']': return CT_OPERATOR;
         case ';': return CT_DELIM;
         case ',': return CT_DELIM;
-        case '"': return 99;
+        case '"': return CT_QUOTE_X2;
+        case '\'': return CT_QUOTE;
         case EOF : return EOF;
         default : return 49;
     }
@@ -313,6 +342,8 @@ string get_state_type(int state){
         case ST_17: return "operator"; // / 
         case ST_20: return "comment"; // / 
         case ST_22: return "comment"; // / 
+        case ST_24: return "string"; // / 
+        case ST_27: return "character literal"; // / 
         default: return "err";
     }
 }
